@@ -1,3 +1,6 @@
+Original repo: https://github.com/apache/cordova-plugin-camera
+PR merged: https://github.com/apache/cordova-plugin-camera/pull/369
+
 ---
 title: Camera
 description: Take pictures with the device camera.
