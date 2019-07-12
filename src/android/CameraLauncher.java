@@ -391,12 +391,14 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
             } else {
                 intent.setAction(Intent.ACTION_GET_CONTENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
             }
         } else if (this.mediaType == VIDEO) {
             intent.setType("video/*");
             title = GET_VIDEO;
             intent.setAction(Intent.ACTION_GET_CONTENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
         } else if (this.mediaType == ALLMEDIA) {
             // I wanted to make the type 'image/*, video/*' but this does not work on all versions
             // of android so I had to go with the wildcard search.
@@ -404,6 +406,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
             title = GET_All;
             intent.setAction(Intent.ACTION_GET_CONTENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
         }
         if (this.cordova != null) {
             this.cordova.startActivityForResult((CordovaPlugin) this, Intent.createChooser(intent,
@@ -739,7 +742,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                             String modifiedPath = this.outputModifiedBitmap(bitmap, uri);
                             // The modified image is cached by the app in order to get around this and not have to delete you
                             // application cache I'm adding the current system time to the end of the file url.
-                            this.callbackContext.success("file://" + modifiedPath + "?" + System.currentTimeMillis());
+                            this.callbackContext.success(modifiedPath);
 
                         } catch (Exception e) {
                             e.printStackTrace();
