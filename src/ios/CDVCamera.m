@@ -728,6 +728,10 @@ static NSString* toBase64(NSData* data) {
 
 @implementation CDVCameraPicker
 
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+    return UIInterfaceOrientationMaskPortraitUpsideDown;
+}
+
 - (BOOL)prefersStatusBarHidden
 {
     return YES;
