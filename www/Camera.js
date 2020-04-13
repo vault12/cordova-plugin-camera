@@ -182,4 +182,17 @@ cameraExport.cleanup = function (successCallback, errorCallback) {
     exec(successCallback, errorCallback, 'Camera', 'cleanup', []);
 };
 
+cameraExport.shot = function (successCallback, errorCallback) {
+    exec(successCallback, errorCallback, 'Camera', 'shot', []);
+};
+
+cameraExport.close = function (successCallback, errorCallback) {
+    exec(successCallback, errorCallback, 'Camera', 'close', []);
+};
+
+cameraExport.setFlash = function (successCallback, errorCallback, mode) {
+    exec(successCallback, errorCallback, 'Camera', 'setFlash', [mode]);
+};
+
+
 module.exports = cameraExport;
