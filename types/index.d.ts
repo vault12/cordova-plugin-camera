@@ -2,7 +2,7 @@
 // Project: https://github.com/apache/cordova-plugin-camera
 // Definitions by: Microsoft Open Technologies Inc <http://msopentech.com>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
-// 
+//
 // Copyright (c) Microsoft Open Technologies Inc
 // Licensed under the MIT license.
 
@@ -42,18 +42,21 @@ interface Camera {
     //    cameraError: (message: string) => void,
     //    cameraOptions?: CameraOptions): CameraPopoverHandle;
 
-    /** 
+    /**
     * Manual controls: make shot and return result from getPicture()
-    */    
+    */
     shot(): void;
-    /** 
+    /**
     * Manual controls: close camera view
     */
     close(): void;
-    /** 
+    /**
     * Set flash mode to one of "on", "off", "auto"
     */
-    setFlash(mode: string): void;
+    setFlash(
+        onSuccess: () => void,
+        onError: (message: string) => void,
+        mode: string): void;
 }
 
 interface CameraOptions {
@@ -142,7 +145,7 @@ interface CameraPopoverOptions {
     /**
      * Direction the arrow on the popover should point. Defined in Camera.PopoverArrowDirection
      * Matches iOS UIPopoverArrowDirection constants.
-     *      ARROW_UP : 1,        
+     *      ARROW_UP : 1,
      *      ARROW_DOWN : 2,
      *      ARROW_LEFT : 4,
      *      ARROW_RIGHT : 8,
