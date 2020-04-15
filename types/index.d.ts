@@ -41,6 +41,19 @@ interface Camera {
     //    cameraSuccess: (data: string) => void,
     //    cameraError: (message: string) => void,
     //    cameraOptions?: CameraOptions): CameraPopoverHandle;
+
+    /** 
+    * Manual controls: make shot and return result from getPicture()
+    */    
+    shot(): void;
+    /** 
+    * Manual controls: close camera view
+    */
+    close(): void;
+    /** 
+    * Set flash mode to one of "on", "off", "auto"
+    */
+    setFlash(mode: string): void;
 }
 
 interface CameraOptions {
