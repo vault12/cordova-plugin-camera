@@ -228,9 +228,11 @@ static NSString* toBase64(NSData* data) {
 - (void)showCameraPicker:(NSString*)callbackId withOptions:(CDVPictureOptions *) pictureOptions
 {
     CDVCameraPicker* cameraPicker = [CDVCameraPicker createFromPictureOptions:pictureOptions];
-    // pick up previously selected flash mode
-    cameraPicker.cameraFlashMode = self.selectedFlashMode;
-    self.pickerController = cameraPicker;
+    if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+        // pick up previously selected flash mode
+        cameraPicker.cameraFlashMode = self.selectedFlashMode;
+        self.pickerController = cameraPicker;
+    }
 
     cameraPicker.delegate = self;
     cameraPicker.callbackId = callbackId;
@@ -254,14 +256,14 @@ static NSString* toBase64(NSData* data) {
             self.hasPendingOperation = NO;
         } else {
             cameraPicker.modalPresentationStyle = UIModalPresentationCurrentContext;
-            
-            // uncomment to enable old behaviour - built-in camera controls
-            // [self.viewController presentViewController:cameraPicker animated:YES completion:^{
-            //     self.hasPendingOperation = NO;
-            // }];
-
-            [self addCameraPickerView];
-            self.hasPendingOperation = NO;
+            if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+                [self addCameraPickerView];
+                self.hasPendingOperation = NO;
+            } else {
+                [self.viewController presentViewController:cameraPicker animated:YES completion:^{
+                    self.hasPendingOperation = NO;
+                }];
+            }
         }
     });
 }
@@ -596,12 +598,12 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.pickerPopoverController = nil;
         invoke();
     } else {
-        
-        // uncomment to enable old behaviour - built-in camera controls
-        // [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
-        
-        [self removeCameraPickerView];
-        invoke();
+        if (cameraPicker.pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+            [self removeCameraPickerView];
+            invoke();
+        } else {
+            [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
+        }
     }
 }
 
@@ -812,7 +814,9 @@ static NSString* toBase64(NSData* data) {
     cameraPicker.pictureOptions = pictureOptions;
     cameraPicker.sourceType = pictureOptions.sourceType;
     cameraPicker.allowsEditing = pictureOptions.allowsEditing;
-    cameraPicker.cameraFlashMode = UIImagePickerControllerCameraFlashModeAuto;
+    if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+        cameraPicker.cameraFlashMode = UIImagePickerControllerCameraFlashModeAuto;
+    }
     
     if (cameraPicker.sourceType == UIImagePickerControllerSourceTypeCamera) {
         // We only allow taking pictures (no video) in this API.
