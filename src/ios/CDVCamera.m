@@ -95,6 +95,8 @@ static NSString* toBase64(NSData* data) {
 
 @property (readwrite, assign) BOOL hasPendingOperation;
 
+@property (assign) UIImagePickerControllerCameraFlashMode selectedFlashMode;
+
 @end
 
 @implementation CDVCamera
@@ -183,10 +185,54 @@ static NSString* toBase64(NSData* data) {
     }];
 }
 
+- (void)shot:(CDVInvokedUrlCommand*)command {
+    [self.pickerController takePicture];
+}
+
+- (void)close:(CDVInvokedUrlCommand*)command {
+    [self removeCameraPickerView];
+    [self imagePickerControllerDidCancel:self.pickerController];
+}
+
+- (void)setFlash:(CDVInvokedUrlCommand*)command {
+    NSString *flash = [command argumentAtIndex:0 withDefault:@"auto"];
+    UIImagePickerControllerCameraFlashMode mode = UIImagePickerControllerCameraFlashModeAuto;
+    if ([flash isEqualToString:@"on"]) {
+        mode = UIImagePickerControllerCameraFlashModeOn;
+    } else if ([flash isEqualToString:@"off"]) {
+        mode = UIImagePickerControllerCameraFlashModeOff;
+    }
+    self.selectedFlashMode = mode;
+    self.pickerController.cameraFlashMode = mode;
+}
+
+- (void)addCameraPickerView {
+    self.pickerController.showsCameraControls = NO;
+    self.webView.opaque = NO;
+    self.webView.backgroundColor = [UIColor clearColor];
+    UIView *view = self.pickerController.view;
+    CGRect frame = view.frame;
+    CGFloat videoFrameHeight = frame.size.width * 4 / 3;
+    frame.origin.y += (frame.size.height - videoFrameHeight) / 2;
+    view.frame = frame;
+    self.webView.superview.backgroundColor = [UIColor blackColor];
+    [self.webView.superview insertSubview:self.pickerController.view belowSubview:self.webView];
+}
+
+- (void)removeCameraPickerView {
+    self.webView.opaque = YES;
+    self.webView.backgroundColor = [UIColor whiteColor];
+    [self.pickerController.view removeFromSuperview];
+}
+
 - (void)showCameraPicker:(NSString*)callbackId withOptions:(CDVPictureOptions *) pictureOptions
 {
     CDVCameraPicker* cameraPicker = [CDVCameraPicker createFromPictureOptions:pictureOptions];
-    self.pickerController = cameraPicker;
+    if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+        // pick up previously selected flash mode
+        cameraPicker.cameraFlashMode = self.selectedFlashMode;
+        self.pickerController = cameraPicker;
+    }
 
     cameraPicker.delegate = self;
     cameraPicker.callbackId = callbackId;
@@ -210,9 +256,14 @@ static NSString* toBase64(NSData* data) {
             self.hasPendingOperation = NO;
         } else {
             cameraPicker.modalPresentationStyle = UIModalPresentationCurrentContext;
-            [self.viewController presentViewController:cameraPicker animated:YES completion:^{
+            if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+                [self addCameraPickerView];
                 self.hasPendingOperation = NO;
-            }];
+            } else {
+                [self.viewController presentViewController:cameraPicker animated:YES completion:^{
+                    self.hasPendingOperation = NO;
+                }];
+            }
         }
     });
 }
@@ -547,7 +598,12 @@ static NSString* toBase64(NSData* data) {
         cameraPicker.pickerPopoverController = nil;
         invoke();
     } else {
-        [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
+        if (cameraPicker.pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+            [self removeCameraPickerView];
+            invoke();
+        } else {
+            [[cameraPicker presentingViewController] dismissViewControllerAnimated:YES completion:invoke];
+        }
     }
 }
 
@@ -758,7 +814,10 @@ static NSString* toBase64(NSData* data) {
     cameraPicker.pictureOptions = pictureOptions;
     cameraPicker.sourceType = pictureOptions.sourceType;
     cameraPicker.allowsEditing = pictureOptions.allowsEditing;
-
+    if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
+        cameraPicker.cameraFlashMode = UIImagePickerControllerCameraFlashModeAuto;
+    }
+    
     if (cameraPicker.sourceType == UIImagePickerControllerSourceTypeCamera) {
         // We only allow taking pictures (no video) in this API.
         cameraPicker.mediaTypes = @[(NSString*)kUTTypeImage];
