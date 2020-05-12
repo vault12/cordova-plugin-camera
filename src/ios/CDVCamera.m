@@ -161,20 +161,8 @@ static NSString* toBase64(NSData* data) {
         if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
             [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted)
              {
-                 if(!granted)
-                 {
-                     // Denied; show an alert
-                     dispatch_async(dispatch_get_main_queue(), ^{
-                         UIAlertController *alertController = [UIAlertController alertControllerWithTitle:[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"] message:NSLocalizedString(@"Access to the camera has been prohibited; please enable it in the Settings app to continue.", nil) preferredStyle:UIAlertControllerStyleAlert];
-                         [alertController addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-                             [weakSelf sendNoPermissionResult:command.callbackId];
-                         }]];
-                         [alertController addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Settings", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-                             [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
-                             [weakSelf sendNoPermissionResult:command.callbackId];
-                         }]];
-                         [weakSelf.viewController presentViewController:alertController animated:YES completion:nil];
-                     });
+                 if (!granted) {
+                     [weakSelf sendNoPermissionResult:command.callbackId];
                  } else {
                      [weakSelf showCameraPicker:command.callbackId withOptions:pictureOptions];
                  }

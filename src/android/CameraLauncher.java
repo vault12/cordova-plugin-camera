@@ -124,7 +124,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
     private static final String SHOT_ACTION = "shot";
     private static final String SET_FLASH_ACTION = "setFlash";
 
-    public static final int PERMISSION_DENIED_ERROR = 20;
+    public static final String PERMISSION_DENIED_ERROR = "has no access to camera";
     public static final int TAKE_PIC_SEC = 0;
     public static final int SAVE_TO_ALBUM_SEC = 1;
 
