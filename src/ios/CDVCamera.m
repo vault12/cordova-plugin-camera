@@ -216,6 +216,15 @@ static NSString* toBase64(NSData* data) {
 - (void)showCameraPicker:(NSString*)callbackId withOptions:(CDVPictureOptions *) pictureOptions
 {
     CDVCameraPicker* cameraPicker = [CDVCameraPicker createFromPictureOptions:pictureOptions];
+    
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        cameraPicker.popoverPresentationController.sourceView = self.viewController.view;
+        CGRect viewRect = self.viewController.view.bounds;
+        CGRect sourceRect = CGRectMake(0, viewRect.size.height, viewRect.size.width, 0);
+        cameraPicker.popoverPresentationController.sourceRect = sourceRect;
+        cameraPicker.preferredContentSize = CGSizeMake(viewRect.size.width, viewRect.size.height);
+    }
+    
     if (pictureOptions.sourceType == UIImagePickerControllerSourceTypeCamera) {
         // pick up previously selected flash mode
         cameraPicker.cameraFlashMode = self.selectedFlashMode;
