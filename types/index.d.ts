@@ -194,3 +194,11 @@ declare var Camera: {
         ARROW_ANY: number;
     }
 };
+
+export {};
+
+declare global {
+    interface Navigator {
+        camera: Camera;
+    }
+}
