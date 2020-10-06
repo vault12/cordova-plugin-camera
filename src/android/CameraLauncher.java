@@ -53,9 +53,9 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.provider.MediaStore;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.FileProvider;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.util.Size;
@@ -538,16 +538,19 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
     private CaptureRequest.Builder createPreviewRequestBuilder() {
         CaptureRequest.Builder builder = null;
         try {
-            builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            if (cameraDevice != null && previewSurface != null) {
+                builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                builder.addTarget(previewSurface);
+                enableDefaultModes(builder);
+            }
         } catch (CameraAccessException e) { e.printStackTrace(); }
-        builder.addTarget(previewSurface);
-        enableDefaultModes(builder);
         return builder;
     }
 
     private void startCapture() {
         try {
             CaptureRequest.Builder builder = createPreviewRequestBuilder();
+            if (builder == null) { return; }
             cameraCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
@@ -588,9 +591,12 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
     }
 
     private void takeShot() {
-        cordova.getActivity().runOnUiThread(() -> {
-            startCapture();
-        });
+        boolean takePicturePermission = PermissionHelper.hasPermission(this, Manifest.permission.CAMERA);
+        if (takePicturePermission) {
+            cordova.getActivity().runOnUiThread(() -> {
+                startCapture();
+            });
+        }
     }
 
     private void saveCameraBitmap() {
