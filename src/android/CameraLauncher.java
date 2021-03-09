@@ -405,8 +405,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         return currentOptimalSize;
     }
 
-    private void setupCamera() {
-        // setup camera
+    void pickOptimalCameraAndPreviewSize() {
         try {
             for (String cameraId : cameraManager.getCameraIdList()) {
                 CameraCharacteristics cameraCharacteristics =
@@ -416,13 +415,21 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                     StreamConfigurationMap streamConfigurationMap = cameraCharacteristics.get(
                             CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                     Size[] outputSizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
-                    // previewSize = streamConfigurationMap.getOutputSizes(SurfaceTexture.class)[0];
-                    previewSize = chooseOptimalSize(outputSizes, 1.333);
+
+                    DisplayMetrics displayMetrics = new DisplayMetrics();
+                    cordova.getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+
+                    double preferred = 1.0 * displayMetrics.heightPixels / displayMetrics.widthPixels;
+                    previewSize = chooseOptimalSize(outputSizes, preferred);
                     this.cameraId = cameraId;
                 }
             }
         } catch (CameraAccessException e) { e.printStackTrace(); }
 
+    }
+
+    private void setupCamera() {
+        // setup camera
         CameraDevice.StateCallback cameraStateCallback = new CameraDevice.StateCallback() {
             @Override
             public void onOpened(@NonNull CameraDevice theCameraDevice) {
@@ -480,6 +487,33 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         Activity activity = cordova.getActivity();
         textureView = new TextureView(activity);
         cameraManager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        cordova.getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int width = displayMetrics.widthPixels;
+        int height = displayMetrics.heightPixels;
+
+        pickOptimalCameraAndPreviewSize();
+
+        // scale camera view to proportionally fill screen
+        double screenRatio = 1.0 * height / width;
+        double previewRatio = 1.0 * previewSize.getWidth() / previewSize.getHeight();
+
+        FrameLayout.LayoutParams params =
+                new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+
+        if (screenRatio > previewRatio) {
+            params.height = height;
+            int proportionalWidth = (int)Math.round(1.0 * height * previewSize.getHeight() / previewSize.getWidth());
+            params.width = proportionalWidth;
+            params.leftMargin = (width - proportionalWidth) / 2;
+        } else {
+            params.width = width;
+            int proportionalHeight = (int)Math.round(1.0 * width * previewSize.getWidth() / previewSize.getHeight());
+            params.height = proportionalHeight;
+            params.topMargin = (height - proportionalHeight) / 2;
+        }
+
         surfaceTextureListener = new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
@@ -493,21 +527,9 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
             public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) { }
         };
         textureView.setSurfaceTextureListener(surfaceTextureListener);
-        FrameLayout.LayoutParams cameraPreviewParams =
-                new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        cordova.getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-        int width = displayMetrics.widthPixels;
-        // calculate height as 4:3
-        int height = (int) Math.round(width * 4.0 / 3);
-        cameraPreviewParams.width = width;
-        cameraPreviewParams.height = height;
-        int paddingTop = (Math.round(displayMetrics.heightPixels - height) / 2);
-        cameraPreviewParams.topMargin = paddingTop;
 
         activity.runOnUiThread(() -> {
-            ((ViewGroup) webView.getView().getParent()).addView(textureView, cameraPreviewParams);
+            ((ViewGroup) webView.getView().getParent()).addView(textureView, params);
             webView.getView().setBackgroundColor(Color.TRANSPARENT);
             webView.getView().bringToFront();
         });
