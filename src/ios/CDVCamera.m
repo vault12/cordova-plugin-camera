@@ -198,11 +198,16 @@ static NSString* toBase64(NSData* data) {
     self.pickerController.showsCameraControls = NO;
     self.webView.opaque = NO;
     self.webView.backgroundColor = [UIColor clearColor];
-    UIView *view = self.pickerController.view;
-    CGRect frame = view.frame;
-    CGFloat videoFrameHeight = frame.size.width * 4 / 3;
-    frame.origin.y += (frame.size.height - videoFrameHeight) / 2;
-    view.frame = frame;
+    
+    // scale camera preview to fit screen proportionally
+    CGSize screenSize = [UIScreen mainScreen].bounds.size;
+    CGFloat viewHeight = screenSize.height;
+    CGFloat cameraViewHeight = screenSize.width * 4 / 3;
+    CGFloat scale = viewHeight / cameraViewHeight;
+    CGAffineTransform translate = CGAffineTransformMakeTranslation(0, (viewHeight - cameraViewHeight) / 2);
+    CGAffineTransform fullScreen = CGAffineTransformMakeScale(scale, scale);
+    self.pickerController.cameraViewTransform = CGAffineTransformConcat(fullScreen, translate);
+    
     self.webView.superview.backgroundColor = [UIColor blackColor];
     [self.webView.superview insertSubview:self.pickerController.view belowSubview:self.webView];
 }
