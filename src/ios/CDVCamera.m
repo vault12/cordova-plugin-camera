@@ -134,8 +134,7 @@ static NSString* toBase64(NSData* data) {
 
 - (BOOL)popoverSupported
 {
-    return (NSClassFromString(@"UIPopoverController") != nil) &&
-           (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
+    return NO;
 }
 
 - (void)takePicture:(CDVInvokedUrlCommand*)command
