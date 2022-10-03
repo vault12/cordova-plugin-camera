@@ -537,6 +537,15 @@ static NSString* toBase64(NSData* data) {
                 } else {
                     result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:[[self urlTransformer:[NSURL fileURLWithPath:filePath]] absoluteString]];
                 }
+                NSURL *imageUrl = [info objectForKey:UIImagePickerControllerImageURL];
+                if (imageUrl != nil) {
+                    // cleanup
+                    NSError *error = nil;
+                    [[NSFileManager defaultManager] removeItemAtURL:imageUrl error:&error];
+                    if (error != nil) {
+                        NSLog(@"[CDVCamera V12 fork] failed to cleanup picked image at URL: %@", imageUrl);
+                    }
+                }
             }
         }
             break;
