@@ -32,7 +32,6 @@ import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
-import android.graphics.Paint;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -51,19 +50,18 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
 import android.provider.MediaStore;
-import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.FileProvider;
 import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.ViewGroup;
-import android.view.WindowInsets;
 import android.widget.FrameLayout;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 
 import org.apache.cordova.BuildHelper;
 import org.apache.cordova.CallbackContext;
@@ -345,20 +343,11 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
     private CameraCaptureSession cameraCaptureSession;
     private Handler backgroundHandler;
     private HandlerThread backgroundThread;
-    private WindowInsets screenInsets;
 
     private static final String FLASH_MODE_AUTO = "auto";
     private static final String FLASH_MODE_ON = "on";
     private static final String FLASH_MODE_OFF = "off";
     private String selectedFlashMode = FLASH_MODE_AUTO;
-
-    @Override
-    protected void pluginInitialize() {
-        cordova.getActivity().getWindow().getDecorView().setOnApplyWindowInsetsListener((view, windowInsets) -> {
-            screenInsets = view.getRootWindowInsets();
-            return windowInsets;
-        });
-    }
 
     private void createPreviewSession() {
         try {
