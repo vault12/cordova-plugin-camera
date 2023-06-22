@@ -46,6 +46,7 @@ import android.media.ExifInterface;
 import android.media.MediaScannerConnection;
 import android.media.MediaScannerConnection.MediaScannerConnectionClient;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -62,6 +63,8 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
+
+import com.google.android.gms.common.util.ArrayUtils;
 
 import org.apache.cordova.BuildHelper;
 import org.apache.cordova.CallbackContext;
@@ -1688,8 +1691,16 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
 
     public void onRequestPermissionResult(int requestCode, String[] permissions,
                                           int[] grantResults) throws JSONException {
-        for (int r : grantResults) {
-            if (r == PackageManager.PERMISSION_DENIED) {
+        String[] deprecatedPermissions = {
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+        };
+        boolean isAndroid13OrHigher = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        for (int i = 0; i < permissions.length; i++) {
+            if (isAndroid13OrHigher && ArrayUtils.contains(deprecatedPermissions, permissions[i])) {
+                continue;
+            }
+            if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
                 this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
                 return;
             }
