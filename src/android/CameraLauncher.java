@@ -22,7 +22,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -32,16 +31,6 @@ import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
-import android.graphics.SurfaceTexture;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraDevice;
-import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CameraMetadata;
-import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.TotalCaptureResult;
-import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
 import android.media.MediaScannerConnection;
 import android.media.MediaScannerConnection.MediaScannerConnectionClient;
@@ -49,22 +38,23 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.provider.MediaStore;
 import android.util.Base64;
-import android.util.DisplayMetrics;
-import android.util.Size;
-import android.view.Surface;
-import android.view.TextureView;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
+import androidx.camera.core.Preview;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.view.PreviewView;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.google.android.gms.common.util.ArrayUtils;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import org.apache.cordova.BuildHelper;
 import org.apache.cordova.CallbackContext;
@@ -84,7 +74,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
 import java.util.Date;
 
 /**
@@ -247,7 +236,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
             callbackContext.success();
             return true;
         } else if (action.equals(CLOSE_ACTION)) {
-            close(callbackContext);
+            stopCapturing(callbackContext);
             return true;
         } else if (action.equals(SET_FLASH_ACTION)) {
             setFlash(args, callbackContext);
@@ -332,332 +321,147 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
     }
 
     /**
-     >>>>>> Custom camera view implementation
+     >>>>>>>>> CUSTOM CAMERA-X IMPLEMENTATION START
      */
-
-    private CameraManager cameraManager;
-    private TextureView textureView;
-    private TextureView.SurfaceTextureListener surfaceTextureListener;
-    private String cameraId;
-    private android.util.Size previewSize;
-    private CameraDevice cameraDevice;
-    private CaptureRequest.Builder captureRequestBuilder;
-    private Surface previewSurface;
-    private CameraCaptureSession cameraCaptureSession;
-    private Handler backgroundHandler;
-    private HandlerThread backgroundThread;
 
     private static final String FLASH_MODE_AUTO = "auto";
     private static final String FLASH_MODE_ON = "on";
     private static final String FLASH_MODE_OFF = "off";
     private String selectedFlashMode = FLASH_MODE_AUTO;
 
-    private void createPreviewSession() {
-        try {
-            SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
-            surfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
-            previewSurface = new Surface(surfaceTexture);
-            captureRequestBuilder = createPreviewRequestBuilder();
-            if (selectedFlashMode.equals(FLASH_MODE_AUTO)) {
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF);
-            } else if (selectedFlashMode.equals(FLASH_MODE_ON)) {
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
-                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_SINGLE);
-            }
+    private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
+    private PreviewView previewView = null;
+    private ImageCapture imageCapture = null;
 
-            cameraDevice.createCaptureSession(Collections.singletonList(previewSurface),
-                    new CameraCaptureSession.StateCallback() {
-                        @Override
-                        public void onConfigured(CameraCaptureSession theCameraCaptureSession) {
-                            if (cameraDevice == null) { return; }
-                            try {
-                                CaptureRequest captureRequest = captureRequestBuilder.build();
-                                cameraCaptureSession = theCameraCaptureSession;
-                                cameraCaptureSession.setRepeatingRequest(captureRequest, null, backgroundHandler);
-                            } catch (CameraAccessException e) { e.printStackTrace(); }
-                        }
-                        @Override
-                        public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) { }
-                    }, backgroundHandler);
-        } catch (CameraAccessException e) { e.printStackTrace(); }
-    }
+    private void showCameraXView() {
+        cordova.getActivity().runOnUiThread(() -> {
+            previewView = new PreviewView(cordova.getActivity());
+            FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            previewView.setLayoutParams(layoutParams);
 
-    private Size chooseOptimalSize(Size[] outputSizes, double preferredRatio) {
-        Size currentOptimalSize = outputSizes[0];
-        double currentOptimalRatio = currentOptimalSize.getWidth() / (double) currentOptimalSize.getHeight();
-        for (Size currentSize : outputSizes) {
-            double currentRatio = currentSize.getWidth() / (double) currentSize.getHeight();
-            if (Math.abs(preferredRatio - currentRatio) <
-                    Math.abs(preferredRatio - currentOptimalRatio)) {
-                currentOptimalSize = currentSize;
-                currentOptimalRatio = currentRatio;
-            }
-        }
-        return currentOptimalSize;
-    }
+            setupCameraProviderFuture();
 
-    void pickOptimalCameraAndPreviewSize() {
-        try {
-            for (String cameraId : cameraManager.getCameraIdList()) {
-                CameraCharacteristics cameraCharacteristics =
-                        cameraManager.getCameraCharacteristics(cameraId);
-                if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) ==
-                        CameraCharacteristics.LENS_FACING_BACK) {
-                    StreamConfigurationMap streamConfigurationMap = cameraCharacteristics.get(
-                            CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                    Size[] outputSizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
-
-                    DisplayMetrics displayMetrics = new DisplayMetrics();
-                    cordova.getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-
-                    double preferred = 1.0 * displayMetrics.heightPixels / displayMetrics.widthPixels;
-                    previewSize = chooseOptimalSize(outputSizes, preferred);
-                    this.cameraId = cameraId;
-                }
-            }
-        } catch (CameraAccessException e) { e.printStackTrace(); }
-
-    }
-
-    private void setupCamera() {
-        // setup camera
-        CameraDevice.StateCallback cameraStateCallback = new CameraDevice.StateCallback() {
-            @Override
-            public void onOpened(@NonNull CameraDevice theCameraDevice) {
-                cameraDevice = theCameraDevice;
-                createPreviewSession();
-            }
-            @Override
-            public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-                cameraDevice.close();
-                cameraDevice = null;
-            }
-            @Override
-            public void onError(@NonNull CameraDevice cameraDevice, int i) {
-                cameraDevice.close();
-                cameraDevice = null;
-            }
-        };
-
-        // open camera
-        try {
-            if (ActivityCompat.checkSelfPermission(cordova.getActivity(), android.Manifest.permission.CAMERA)
-                    == PackageManager.PERMISSION_GRANTED) {
-                cameraManager.openCamera(cameraId, cameraStateCallback, backgroundHandler);
-            }
-        } catch (CameraAccessException e) { e.printStackTrace(); }
-    }
-
-    private void setupBackgroundHandler() {
-        backgroundThread = new HandlerThread("camera_background_thread");
-        backgroundThread.start();
-        backgroundHandler = new Handler(backgroundThread.getLooper());
-    }
-
-    private void closeCamera() {
-        if (cameraCaptureSession != null) {
-            cameraCaptureSession.close();
-            cameraCaptureSession = null;
-        }
-        if (cameraDevice != null) {
-            cameraDevice.close();
-            cameraDevice = null;
-        }
-    }
-
-    private void closeBackgroundThread() {
-        if (backgroundHandler != null) {
-            backgroundThread.quitSafely();
-            backgroundThread = null;
-            backgroundHandler = null;
-        }
-    }
-
-    private void showCameraView() {
-        setupBackgroundHandler();
-        Activity activity = cordova.getActivity();
-        textureView = new TextureView(activity);
-        cameraManager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
-
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        cordova.getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-        int width = displayMetrics.widthPixels;
-        int height = displayMetrics.heightPixels;
-
-        pickOptimalCameraAndPreviewSize();
-
-        // scale camera view to proportionally fill screen
-        double screenRatio = 1.0 * height / width;
-        double previewRatio = 1.0 * previewSize.getWidth() / previewSize.getHeight();
-
-        FrameLayout.LayoutParams params =
-                new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-
-        if (screenRatio > previewRatio) {
-            params.height = height;
-            int proportionalWidth = (int)Math.round(1.0 * height * previewSize.getHeight() / previewSize.getWidth());
-            params.width = proportionalWidth;
-            params.leftMargin = (width - proportionalWidth) / 2;
-        } else {
-            params.width = width;
-            int proportionalHeight = (int)Math.round(1.0 * width * previewSize.getWidth() / previewSize.getHeight());
-            params.height = proportionalHeight;
-            params.topMargin = (height - proportionalHeight) / 2;
-        }
-
-        surfaceTextureListener = new TextureView.SurfaceTextureListener() {
-            @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-                setupCamera();
-            }
-            @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) { }
-            @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) { return false; }
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) { }
-        };
-        textureView.setSurfaceTextureListener(surfaceTextureListener);
-
-        activity.runOnUiThread(() -> {
-            ((ViewGroup) webView.getView().getParent()).addView(textureView, params);
+            ((ViewGroup) webView.getView().getParent()).addView(previewView, layoutParams);
             webView.getView().setBackgroundColor(Color.TRANSPARENT);
             webView.getView().bringToFront();
         });
-
     }
 
-    private void hideCameraView() {
-        closeCamera();
-        closeBackgroundThread();
-        webView.getView().setBackgroundColor(Color.WHITE);
-        ((ViewGroup) webView.getView().getParent()).removeView(textureView);
+    private void setupCameraProviderFuture() {
+        Activity activity = cordova.getActivity();
+        cameraProviderFuture = ProcessCameraProvider.getInstance(activity);
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                bindPreview(cameraProvider, previewView);
+            } catch (Exception e) { e.printStackTrace(); }
+        }, ContextCompat.getMainExecutor(activity));
     }
 
-    private void close(CallbackContext theCallbackContext) {
-        cordova.getActivity().runOnUiThread(() -> {
-            hideCameraView();
-            cordova.getThreadPool().execute(() -> {
-                theCallbackContext.success();
-            });
-        });
+    private void bindPreview(@NonNull ProcessCameraProvider cameraProvider, PreviewView previewView) {
+        Preview preview = new Preview.Builder().build();
+        CameraSelector cameraSelector = new CameraSelector.Builder()
+                .requireLensFacing(CameraSelector.LENS_FACING_BACK) // Use the back camera
+                .build();
+        preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
+        imageCapture = new ImageCapture.Builder()
+                .setFlashMode(getFlashModeInt(selectedFlashMode))
+                .build();
+
+        cameraProvider.bindToLifecycle(cordova.getActivity(), cameraSelector, preview, imageCapture);
     }
 
-    private void enableDefaultModes(CaptureRequest.Builder builder) {
-        builder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
-        builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-    }
+    private void takePhoto() {
+        Activity activity = cordova.getActivity();
+        File photoFile = new File(this.imageUri.getFilePath());
+        ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
 
-    private CaptureRequest.Builder createPreviewRequestBuilder() {
-        CaptureRequest.Builder builder = null;
-        try {
-            if (cameraDevice != null && previewSurface != null) {
-                builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-                builder.addTarget(previewSurface);
-                enableDefaultModes(builder);
-            }
-        } catch (CameraAccessException e) { e.printStackTrace(); }
-        return builder;
-    }
-
-    private void startCapture() {
-        try {
-            CaptureRequest.Builder builder = createPreviewRequestBuilder();
-            if (builder == null) { return; }
-            cameraCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
-                @Override
-                public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-                    super.onCaptureCompleted(session, request, result);
-                    try {
-                        CaptureRequest.Builder builder = createPreviewRequestBuilder();
-                        builder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START);
-                        cameraCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
-                            @Override
-                            public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-                                super.onCaptureCompleted(session, request, result);
-                                try {
-                                    CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-                                    builder.addTarget(previewSurface);
-                                    enableDefaultModes(builder);
-                                    cameraCaptureSession.stopRepeating();
-                                    cameraCaptureSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
-                                        @Override
-                                        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-                                            super.onCaptureCompleted(session, request, result);
-                                            saveCameraBitmap();
-                                        }
-                                    }, backgroundHandler);
-                                } catch (CameraAccessException e) { e.printStackTrace(); }
-                            }
-                        }, backgroundHandler);
-                    } catch (CameraAccessException e) { e.printStackTrace(); }
+        imageCapture.takePicture(outputFileOptions, ContextCompat.getMainExecutor(activity), new ImageCapture.OnImageSavedCallback() {
+            @Override
+            public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                try {
+                    processResultFromCamera(destType, null);
+                } catch (IOException e) {
+                    stopWithCallbackError(e);
+                } finally {
+                    hideCameraXView();
                 }
-            }, backgroundHandler);
-        } catch (CameraAccessException e) { e.printStackTrace(); }
-    }
-
-    // use to enable re-capture
-    private void unlock() {
-        try {
-            cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, backgroundHandler);
-        } catch (CameraAccessException e) { e.printStackTrace(); }
+            }
+            @Override
+            public void onError(@NonNull ImageCaptureException exception) {
+                hideCameraXView();
+                stopWithCallbackError(exception);
+            }
+        });
     }
 
     private void takeShot() {
         boolean takePicturePermission = PermissionHelper.hasPermission(this, Manifest.permission.CAMERA);
         if (takePicturePermission) {
             cordova.getActivity().runOnUiThread(() -> {
-                startCapture();
+                takePhoto();
             });
         }
     }
 
-    private void saveCameraBitmap() {
-        FileOutputStream outputPhoto = null;
-        try {
-            outputPhoto = new FileOutputStream(this.imageUri.getFilePath());
-            textureView.getBitmap().compress(Bitmap.CompressFormat.PNG, 100, outputPhoto);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (outputPhoto != null) {
-                    outputPhoto.close();
-                }
-            } catch (IOException e) { e.printStackTrace(); }
-        }
-        try {
-            processResultFromCamera(destType, null);
-        } catch (IOException e) { e.printStackTrace(); }
-
-        cordova.getActivity().runOnUiThread(() -> {
-            hideCameraView();
-        });
-    }
-
-
-    void setFlash(JSONArray args, CallbackContext callbackContext) {
+    private void setFlash(JSONArray args, CallbackContext callbackContext) {
         String flash = args.optString(0, "");
         selectedFlashMode = flash;
-        if (cameraCaptureSession != null) {
-            captureRequestBuilder = createPreviewRequestBuilder();
-            if (selectedFlashMode.equals(FLASH_MODE_AUTO)) {
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF);
-            } else if (selectedFlashMode.equals(FLASH_MODE_ON)) {
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
-                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_SINGLE);
-            }
-            try {
-                cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, backgroundHandler);
-            } catch (CameraAccessException e) { e.printStackTrace(); }
+        if (imageCapture != null) {
+            imageCapture.setFlashMode(getFlashModeInt(selectedFlashMode));
         }
         callbackContext.success();
     }
 
+    private int getFlashModeInt(String flashModeString) {
+        if (selectedFlashMode.equals(FLASH_MODE_ON)) {
+            return ImageCapture.FLASH_MODE_ON;
+        } else if (selectedFlashMode.equals(FLASH_MODE_OFF)) {
+            return ImageCapture.FLASH_MODE_OFF;
+        } else {
+            return ImageCapture.FLASH_MODE_AUTO;
+        }
+    }
+
+    private void stopWithCallbackError(Exception e) {
+        e.printStackTrace();
+        stopWithCallbackError(e.getLocalizedMessage());
+    }
+
+    private void stopWithCallbackError(String message) {
+        callbackContext.error(message);
+        hideCameraXView();
+    }
+
+    private void hideCameraXView() {
+        if (imageCapture != null && cameraProviderFuture != null && previewView != null) {
+            cordova.getActivity().runOnUiThread(() -> {
+                try {
+                    ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                    cameraProvider.unbindAll();
+                    imageCapture = null;
+                    cameraProviderFuture = null;
+                    ((ViewGroup) webView.getView().getParent()).removeView(previewView);
+                    webView.getView().setBackgroundColor(Color.WHITE);
+                    previewView = null;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
+
+    private void stopCapturing(CallbackContext callbackContext) {
+        hideCameraXView();
+        callbackContext.success();
+    }
+
     /**
-     <<<<<< Custom camera view implementation
+     <<<<<<<<< CUSTOM CAMERA-X IMPLEMENTATION END
      */
 
     public void takePicture(int returnType, int encodingType)
@@ -672,7 +476,8 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                 applicationId + ".provider",
                 photo));
 
-        showCameraView();
+        // CameraX API new impl
+        showCameraXView();
 
         // old (and still working) code to use camera intent. leaving for reference
         // uncomment to rollback old behavior and comment out 'showCameraView'
