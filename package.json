@@ -1,6 +1,6 @@
 {
   "name": "@vault12/plugin-camera",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "Cordova Camera Plugin",
   "types": "./types/index.d.ts",
   "bugs": {
