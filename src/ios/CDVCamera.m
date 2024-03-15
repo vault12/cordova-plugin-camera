@@ -195,8 +195,9 @@ static NSString* toBase64(NSData* data) {
 
 - (void)addCameraPickerView {
     self.pickerController.showsCameraControls = NO;
-    self.webView.opaque = NO;
-    self.webView.backgroundColor = [UIColor clearColor];
+    self.viewController.view.opaque = NO;
+    self.viewController.view.backgroundColor = [UIColor clearColor];
+    [self.viewController.view.subviews objectAtIndex:0].backgroundColor = [UIColor clearColor];
     
     // scale camera preview to fit screen proportionally
     CGSize screenSize = [UIScreen mainScreen].bounds.size;
@@ -206,14 +207,13 @@ static NSString* toBase64(NSData* data) {
     CGAffineTransform translate = CGAffineTransformMakeTranslation(0, (viewHeight - cameraViewHeight) / 2);
     CGAffineTransform fullScreen = CGAffineTransformMakeScale(scale, scale);
     self.pickerController.cameraViewTransform = CGAffineTransformConcat(fullScreen, translate);
-    
-    self.webView.superview.backgroundColor = [UIColor blackColor];
-    [self.webView.superview insertSubview:self.pickerController.view belowSubview:self.webView];
+    [self.viewController.view.superview insertSubview:self.pickerController.view belowSubview:self.viewController.view];
 }
 
 - (void)removeCameraPickerView {
-    self.webView.opaque = YES;
-    self.webView.backgroundColor = [UIColor whiteColor];
+    self.viewController.view.opaque = YES;
+    self.viewController.view.backgroundColor = [UIColor whiteColor];
+    [self.viewController.view.subviews objectAtIndex:0].backgroundColor = [UIColor whiteColor];
     [self.pickerController.view removeFromSuperview];
 }
 
