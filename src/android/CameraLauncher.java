@@ -53,7 +53,6 @@ import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
-import com.google.android.gms.common.util.ArrayUtils;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.apache.cordova.BuildHelper;
@@ -74,6 +73,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 
 /**
@@ -1502,7 +1502,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         };
         boolean isAndroid13OrHigher = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
         for (int i = 0; i < permissions.length; i++) {
-            if (isAndroid13OrHigher && ArrayUtils.contains(deprecatedPermissions, permissions[i])) {
+            if (isAndroid13OrHigher && Arrays.asList(permissions).contains(permissions[i])) {
                 continue;
             }
             if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
