@@ -206,7 +206,24 @@ static NSString* toBase64(NSData* data) {
     CGFloat scale = viewHeight / cameraViewHeight;
     CGAffineTransform translate = CGAffineTransformMakeTranslation(0, (viewHeight - cameraViewHeight) / 2);
     CGAffineTransform fullScreen = CGAffineTransformMakeScale(scale, scale);
-    self.pickerController.cameraViewTransform = CGAffineTransformConcat(fullScreen, translate);
+    CGAffineTransform translate = CGAffineTransformMakeTranslation(0, (viewHeight - cameraViewHeight) / 2);
+    CGAffineTransform fullScreen = CGAffineTransformMakeScale(scale, scale);
+    CGAffineTransform contatenated = CGAffineTransformConcat(fullScreen, translate);
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        CGAffineTransform rotate = CGAffineTransformRotate(contatenated, M_PI);
+        if (@available(iOS 14.0, *)) {
+            if ([[NSProcessInfo processInfo] isiOSAppOnMac]) {
+                CGAffineTransform moveUp = CGAffineTransformMakeTranslation(0, -40);
+                self.pickerController.cameraViewTransform = CGAffineTransformConcat(rotate, moveUp);
+            } else {
+                self.pickerController.cameraViewTransform = rotate;
+            }
+        } else {
+            self.pickerController.cameraViewTransform = rotate;
+        }
+    } else {
+        self.pickerController.cameraViewTransform = contatenated;
+    }
     [self.viewController.view.superview insertSubview:self.pickerController.view belowSubview:self.viewController.view];
 }
 
