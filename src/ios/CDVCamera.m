@@ -206,8 +206,6 @@ static NSString* toBase64(NSData* data) {
     CGFloat scale = viewHeight / cameraViewHeight;
     CGAffineTransform translate = CGAffineTransformMakeTranslation(0, (viewHeight - cameraViewHeight) / 2);
     CGAffineTransform fullScreen = CGAffineTransformMakeScale(scale, scale);
-    CGAffineTransform translate = CGAffineTransformMakeTranslation(0, (viewHeight - cameraViewHeight) / 2);
-    CGAffineTransform fullScreen = CGAffineTransformMakeScale(scale, scale);
     CGAffineTransform contatenated = CGAffineTransformConcat(fullScreen, translate);
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
         CGAffineTransform rotate = CGAffineTransformRotate(contatenated, M_PI);
